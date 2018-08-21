@@ -4,14 +4,12 @@ import re
 import subprocess
 import sys
 
-from pathlib import Path
-from multiprocessing import Pool
 from Bio import AlignIO
 from Bio import SeqIO
-# from Bio import SeqRecord
 from Bio.Align import AlignInfo
-from VulgarityFilter import *
-# from Bio.Seq import Seq
+from multiprocessing import Pool
+from pathlib import Path
+from VulgarityFilter import vulgarity_filter
 
 
 def raxpartition_reader(part_file):
@@ -21,7 +19,7 @@ def raxpartition_reader(part_file):
         part_file: partition file output by agalma. In Raxml format. Looks like this:
         "WAG, 23621 = 1-440"
 
-    Returns:∂
+    Returns:
         A python list of the start and stop coordinates of every gene
         in the supermatirx (concatenated gene alignments)
     """
@@ -48,14 +46,15 @@ def alncutter(partitions, aln_file, aln_type, genealn_outdir):
 
     Args:
         partitions: A python list of the start and stop coordinates of every gene
-        aln_file: Posix Path object of the alignment file to subsample partitions from
+        aln_file: Path string the alignment file to subsample partitions from
         aln_type: Biopython alignments type (eg. 'fasta' or 'phyllip relaxed')
         genealn_outdir: The path to write sub-alignments to.
     """
+    records = list(SeqIO.parse(aln_file, aln_type))
     for i, (start, end) in enumerate(partitions):
         out_path = str(Path(genealn_outdir)/f"{str(Path(aln_file).stem)}_{i}.fas")
         with open(out_path, 'w') as out:
-            for record in SeqIO.parse(aln_file, aln_type):
+            for record in records:
                 sequence = record.seq[start:end]
                 # Skip seqs made only of gaps
                 if len(set(sequence)) > 1:
@@ -66,7 +65,7 @@ def alncutter(partitions, aln_file, aln_type, genealn_outdir):
 
 def consensus_generator(aln_folder, aln_type, consensus_file):
     """Creates a simple consensus sequence (70% majority) of each alignment
-     and writes them to the consensus_file
+     in aln_folder and writes them to the consensus_file
 
     Args:
         aln_folder: The folder with alignments to make consensus seqs of
@@ -99,7 +98,7 @@ def dna_or_aa(seq_file):
         print(f"ERROR:{seq_file} has '-' or 'X' in it. Please fix and run again")
         sys.exit(1)
     else:
-        print(f"ERROR:{seq_file} cannot read")
+        print(f"Error reading {seq_file} ")
         sys.exit(1)
     return alphabet
 
@@ -148,7 +147,7 @@ def run_command(command, command_out_path=None):
     command_output = subprocess.getstatusoutput(command)
     if command_output[0]:
         print(f"{command} Failed")
-        sys.exit(1)
+        return None
     if command_out_path:
         with open(command_out_path, "w") as out_handle:
             out_handle.write(command_output[1])
@@ -164,15 +163,14 @@ def fetchseq(names_tofetch, seqfile):
 
 
 def groupagalmabytxtm(codex_dict, alnaa_folder, txtm):
-    """Reads AA agalma alignments and renames seqs as Refseq Loci and
-     saves fasta file as txtm.
+    """Saves the sequence that has the same header as txtm from each
+    alignment in alnaa_folder to a file named "AAbytxtm/<txtm>.fas"
     Strips the gaps from the AA sequences and removes seqs shorter than 50AA
     See agalmaaa2txtmdna for more info"""
     txtm_aaseq_dict = {}
     for agalID, RefseqProtID in codex_dict.items():
         agal_aln_path = str(Path(alnaa_folder)/f"{agalID}.fas")
         agal_aln = SeqIO.index(agal_aln_path, 'fasta')
-        # print(agal_aln)
         try:
             aaseq = str(agal_aln[txtm].seq).replace('-', '')
             if len(aaseq) > 50:  # Causes errors with blast if too short
@@ -189,8 +187,7 @@ def groupagalmabytxtm(codex_dict, alnaa_folder, txtm):
 
 
 def blastbytxtm(alnaa_folder, txtm_folder, txtm):
-    """the AA seqs of loci grouped by transcriptome are reciprically blasted
-     to the same DNA transcriptome file.
+    """Each amino acid sequence is blasted to the DNA transcriptome assembly.
     The results are written to the  txtm_dna_out_folder in fasta format.
     The fasta headers are '>txtm-loci' to be legible for cat_by_gene()
     See agalmaaa2txtmdna for more info"""
@@ -198,7 +195,7 @@ def blastbytxtm(alnaa_folder, txtm_folder, txtm):
     blastdb_path = str(Path(txtm_folder)/f"{txtm}.fas")
     blast_out = str(query_path/f"{txtm}_recipblast.txt")
     # This step takes 10 min.
-    # blaster(threads=7, query=str(query_path/f"{txtm}.fas"), blastdb_prefix=blastdb_path, blast_out_path = blast_out)
+    blaster(threads=7, query=str(query_path/f"{txtm}.fas"), blastdb_prefix=blastdb_path, blast_out_path=blast_out)
     # store blast results as dictionary
     rblast_dict = {}
     with open(blast_out, 'r') as rblastout_handle:
@@ -258,11 +255,7 @@ def agalmaaa2txtmdna(codex_file, alnaa_folder, txtm_folder):
             if 'fa' in file.suffix:
                 txtms.append(file.stem)
     # Create a dictionary to translate agalma ID's to the top hit refseq Protein ID
-    codex_dict = {}
-    with open(codex_file) as f:
-        for line in f:
-            (agalID, RefseqProtID) = line.split()
-            codex_dict[agalID] = RefseqProtID
+    codex_dict = codex_file_reader(codex_file)
     # Make new fasta of agalma output grouped by transcriptome, strips gaps
     for txtm in txtms:
         groupagalmabytxtm(codex_dict, alnaa_folder, txtm)
@@ -274,14 +267,21 @@ def agalmaaa2txtmdna(codex_file, alnaa_folder, txtm_folder):
     return
 
 
-def generate_partitions(substring_fasta, alignment):
+def generate_partitions(substring_fasta, aln_file):
     """
+
+    Args:
+        substring_fasta: 
+        aln_file:
+
+    Out:
+        partitions:
 
 
     substrings must be in order
     '_cds_' must be in fasta header of substring concat sequence(cds_string) """
 
-    for record in SeqIO.parse(alignment, 'fasta'):
+    for record in SeqIO.parse(aln_file, 'fasta'):
         if '_cds_' in record.name:
             cds_string = str(record.seq).upper()
     exon_starts = []  # list of the start index of the exons.
@@ -332,18 +332,19 @@ def fasta_subseter(subset_list, in_fasta_path, out_fasta_path):
             if name in key:
                 out_records.append(input_dict[key])
     with open(out_fasta_path, "w") as out_handle:
-       SeqIO.write(out_records, out_handle, 'fasta')
+        SeqIO.write(out_records, out_handle, 'fasta')
     return
+
 
 def codex_file_reader(codex_file):
     """The codex dictionary that this function returns is the blast result of the
     agalma alignment reference to the reference genome CDS.
     The dicitonary key is the agalma gene alignment ID and the
-    dictionary value is the RefSeq Protein ID from the reference genome. 
+    dictionary value is the RefSeq Protein ID from the reference genome.
 
-    This function removes any agalma genes that blast to the same 
-    RefSeq gene. This ensures that we do not design baits that target multiple 
-    portions of the genome. 
+    This function removes any agalma genes that blast to the same
+    RefSeq gene. This ensures that we do not design baits that target multiple
+    portions of the genome.
     """
     raw_list = []
     bad_list = []
@@ -351,7 +352,6 @@ def codex_file_reader(codex_file):
     with open(codex_file) as f:
         for line in f:
             raw_list.append(line.split()[1])
-
 
     for item in raw_list:
         if raw_list.count(item) > 1:
@@ -374,70 +374,139 @@ def fetch_refseqcds(refseqcds, codex_file, outfile):
 
 
 def lessgappy_maffter(fasta_file_path, out_file_path, num_threads):
-    """ Runs mafft alignment on fasta file. Options result in an alignment with 
-    very few gaps (simmilar to muscle). Sequences are checked for reverse complementing 
-    and the output string removes the R_ prefix that mafft adds to 
+    """ Runs mafft alignment on fasta file. Options result in
+    an alignment with very few gaps (simmilar to muscle).
+    Sequences are checked for reverse complementing
+    and the output string removes the R_ prefix that mafft adds to
     sequences that were reverse complemented
     """
     command = f"mafft --reorder --adjustdirection --leavegappyregion --op 3.0 --ep 1.0 --maxiterate 1000 --retree 1 --genafpair --thread {num_threads} --quiet --auto {fasta_file_path}"
     mafft_output = run_command(command)
-    with open(out_file_path, "w") as out_handle:
-            out_handle.write(mafft_output.replace("_R_", ""))
-    return    
+    if mafft_output:
+        with open(out_file_path, "w") as out_handle:
+                out_handle.write(mafft_output.replace("_R_", ""))
+        return
+    else:
+        return
 
-def CDS_loci_merger(codex_file,cds_file,DNAbyLoci_folder,DNACDSbyloci_folder):
-    """ For every line of the codex file this will pull the CDS sequence from cds_file and combine it with the 
-    gene file from DNAbyLoci_folder. Results are writen to DNACDSbyloci_folder
 
-    """ 
-    Path(DNACDSbyloci_folder).mkdir(exist_ok=True)
+def cds_loci_merger(codex_file, cds_file, dnabyloci_folder, dnacdsbyloci_folder):
+    """ For every line of the codex file this will pull the CDS sequence from
+    cds_file and combine it with the gene file from dnabyloci_folder.
+    Results are writen to dnacdsbyloci_folder
+
+    """
+    Path(dnacdsbyloci_folder).mkdir(exist_ok=True)
     to_fetch = codex_file_reader(codex_file).values()
     cds_records = SeqIO.parse(cds_file, "fasta")
     for refseqID in to_fetch:
-        loci_file_path = Path(DNAbyLoci_folder)/f"{refseqID}.fas"
-        loci_cds_file_path = Path(DNACDSbyloci_folder)/f"{refseqID}.fas"
+        loci_file_path = Path(dnabyloci_folder)/f"{refseqID}.fas"
+        loci_cds_file_path = Path(dnacdsbyloci_folder)/f"{refseqID}.fas"
         records_to_write = SeqIO.parse(str(loci_file_path), "fasta")
-        for cds in cds_records:
-            if refseqID in cds.name:
-                # print(refseqID,cds.name)
-                with open(loci_cds_file_path,'w') as out_handle:
-                    SeqIO.write(cds,out_handle,'fasta')
-                    SeqIO.write(records_to_write,out_handle,'fasta')
-                    break
+        if not records_to_write:
+            # Skip entry if there are no sequences to write in the DNAbyLoci folder
+            break
+        else:
+            for cds in cds_records:
+                if refseqID in cds.name:
+                    # print(refseqID,cds.name)
+                    with open(loci_cds_file_path, 'w') as out_handle:
+                        SeqIO.write(cds, out_handle, 'fasta')
+                        SeqIO.write(records_to_write, out_handle, 'fasta')
+                        break
 
     return
+
+
+def cut_genealns_to_exonalns(codex_file, cds_exon_folder, cds_loci_folder, exonaln_foler):
+    """ For each loci in the codex, this will cut the loci alignment by exons
+    and save it to exonaln_folder as Loci_Exonnumber.fas
+    """
+    good_loci = codex_file_reader(codex_file=codex_file).values()
+    for loci in good_loci:
+        cds_exon_file = Path(cds_exon_folder)/f"{loci}.fas"
+        loci_aln_file = Path(cds_loci_folder)/f"{loci}.fas"
+        if cds_exon_file.exists() and loci_aln_file.exists():
+            loci_partitions = generate_partitions(substring_fasta=str(cds_exon_file), aln_file=str(loci_aln_file))
+            alncutter(loci_partitions, aln_file=str(loci_aln_file), aln_type='fasta', genealn_outdir=exonaln_foler)
+    return
+
+
+def exon_aln_filter(exonaln_folder, filtered_exonaln_folder, min_exon_length=0, min_taxoncov=0):
+    """
+        
+    """
+    Path(filtered_exonaln_folder).mkdir(exist_ok=True)
+    exon_files = [str(exon_file) for exon_file in Path(exonaln_folder).iterdir() if '.fa' in exon_file.suffix]
+    exons2write = []
+    for exon_file in exon_files:
+        records = list(SeqIO.parse(exon_file, 'fasta'))
+        if len(records) > 0:
+            if len(records) > min_taxoncov \
+                        and len(records[0].seq) > min_exon_length:
+                exons2write.append(exon_file)
+                outfile_stem = Path(exon_file).name
+                out_path = Path(filtered_exonaln_folder)/outfile_stem
+                with open(out_path, 'w') as out_handle:
+                    SeqIO.write(records, out_handle, 'fasta')
+    print(len(exons2write))
+
+    return
+
+
+aglama_partition_file = ''
+agalma_supermatrix_file = ''
+
+
+# partitions = raxpartition_reader(part_file='/Users/josec/Desktop/exoncap/corals/Txtms/100.supermatrix.partition.txt')
+# alncutter(partitions=partitions, aln_file='/Users/josec/Desktop/exoncap/corals/Txtms/100.supermatrix.fa', aln_type='fasta', genealn_outdir='/Users/josec/Desktop/exoncap/corals/AgalmaAAaln2')
+
 # consensus_generator('/Users/josec/Desktop/exoncap/Mygal/alns','fasta','/Users/josec/Desktop/exoncap/Mygal/reports/test.fa')
 
 # Genrate Codex
-blaster(threads=8, query='/Users/josec/Desktop/exoncap/Mygal/reports/test.fa',blastdb_prefix='/Users/josec/Desktop/exoncap/Mygal/RefSeq/GCF_000365465.2_Ptep_2.0_protein.faa',blast_out_path='/Users/josec/Desktop/exoncap/Mygal/blasttest.txt')
+# blaster(threads=8, query='/Users/josec/Desktop/exoncap/Mygal/reports/test.fa',blastdb_prefix='/Users/josec/Desktop/exoncap/Mygal/RefSeq/GCF_000365465.2_Ptep_2.0_protein.faa',blast_out_path='/Users/josec/Desktop/exoncap/Mygal/blasttest.txt')
 
-# DONT run agalmaaa2txtmdna multiple times because it appends to sequence files, not overwrites
+# # DONT run agalmaaa2txtmdna multiple times because it appends to sequence files in DNAbyLoci, not overwrites
 # agalmaaa2txtmdna(codex_file='/Users/josec/Desktop/exoncap/Mygal/blasttest.txt',alnaa_folder='/Users/josec/Desktop/exoncap/Mygal/alns/',txtm_folder='/Users/josec/Desktop/exoncap/Mygal/Assemblies/')
 
 
-# fetch_refseqcds(refseqcds='/Users/josec/Desktop/exoncap/Mygal/RefSeq/GCF_000365465.2_Ptep_2.0_cds_from_genomic.fna', codex_file='/Users/josec/Desktop/exoncap/Mygal/blasttest.txt', outfile='/Users/josec/Desktop/exoncap/Mygal/refseqcds_loci.fas')
 
 # # Generate Gene alignments with refseq and minimal gaps
-# CDS_loci_merger(codex_file='/Users/josec/Desktop/exoncap/Mygal/blasttest.txt', cds_file='/Users/josec/Desktop/exoncap/Mygal/refseqcds_loci.fas', DNAbyLoci_folder='/Users/josec/Desktop/exoncap/Mygal/alns/DNAbyLoci',DNACDSbyloci_folder='/Users/josec/Desktop/exoncap/Mygal/alns/DNAcdsbyLoci')
+# fetch_refseqcds(refseqcds='/Users/josec/Desktop/exoncap/Mygal/RefSeq/GCF_000365465.2_Ptep_2.0_cds_from_genomic.fna', codex_file='/Users/josec/Desktop/exoncap/Mygal/blasttest.txt', outfile='/Users/josec/Desktop/exoncap/Mygal/refseqcds_loci.fas')
+# cds_loci_merger(codex_file='/Users/josec/Desktop/exoncap/Mygal/blasttest.txt', cds_file='/Users/josec/Desktop/exoncap/Mygal/refseqcds_loci.fas', dnabyloci_folder='/Users/josec/Desktop/exoncap/Mygal/alns/DNAbyLoci',dnacdsbyloci_folder='/Users/josec/Desktop/exoncap/Mygal/alns/DNAcdsbyLoci')
 # to_aln_files = [x for x in Path('/Users/josec/Desktop/exoncap/Mygal/alns/DNAcdsbyLoci').iterdir() if '.fa' in x.suffix]
 # aln = Path("/Users/josec/Desktop/exoncap/Mygal/LociAlns")
 # for loci in to_aln_files:
 #     lessgappy_maffter(fasta_file_path=loci, out_file_path=aln/f"{loci.name}",num_threads=7)
 
+# def ugly():
+    # good_loci = codex_file_reader(codex_file='/Users/josec/Desktop/exoncap/Mygal/blasttest.txt').values()
+    # with open('/Users/josec/Desktop/exoncap/Mygal/refseqcds_intronerator_out.txt','r') as outhandle1:
+    #     intronerator_out_string = outhandle1.read()
+    #     intronerator_out = intronerator_out_string.split("END")
+    # intronerator_out_path = '/Users/josec/Desktop/exoncap/Mygal/refseqcds_intronerator_out_filtered.txt'
+
+    # with open(intronerator_out_path,'w') as out_handle:
+    #     for item in intronerator_out:
+    #         tname = item.split('\t')[0]
+    #         gene_raw = tname.split("cds_")[1].split("_")
+    #         gene = f"{gene_raw[0]}_{gene_raw[1]}"
+    #         if gene in good_loci:
+    #             out_handle.write(item+"END")
+    # return
+# ugly()
+
 
 # This step takes a whiiiiiiiiiiiiile!! 3 days
 # intronerator_out = intronerator(threads=8, genome_fasta='/Users/josec/Desktop/exoncap/Mygal/RefSeq/GCF_000365465.2_Ptep_2.0_genomic.fna', target_cds='/Users/josec/Desktop/exoncap/Mygal/refseqcds_loci.fas')
-# intronerator_out_path = '/Users/josec/Desktop/exoncap/Mygal/refseqcds_intronerator_out.txt'
+# intronerator_out_path = '/Users/josec/Desktop/exoncap/Mygal/refseqcds_intronerator_out_filtered.txt'
 # with open(intronerator_out_path,'w') as out_handle:
 #     for item in intronerator_out:
 #         out_handle.write(item)
-# vulgarity_filter(intronerator_out_path)
+# VulgarityFilter.vulgarity_filter(intronerator_out_path)
 
-# lessgappy_maffter('/Users/josec/Desktop/exoncap/Mygal/RefSeq/XP_015905217.1a.fas','/Users/josec/Desktop/exoncap/Mygal/RefSeq/aclXP_015905217.fas',8)
+# cut_genealns_to_exonalns(codex_file='/Users/josec/Desktop/exoncap/Mygal/blasttest.txt', cds_exon_folder='/Users/josec/Desktop/exoncap/Mygal/Exons', cds_loci_folder='/Users/josec/Desktop/exoncap/Mygal/LociAlns', exonaln_foler='/Users/josec/Desktop/exoncap/Mygal/ExonAlns')
 
-# PARTS = generate_partitions(substring_fasta='/Users/josec/Desktop/exoncap/Mygal/exons/XP_015905217.fas', alignment='/Users/josec/Desktop/exoncap/Mygal/RefSeq/aclXP_015905217.fas',)
-# print(PARTS)
-# alncutter(PARTS, aln_file='/Users/josec/Desktop/exoncap/Mygal/RefSeq/aclXP_015905217.fas', aln_type='fasta', genealn_outdir='/Users/josec/Desktop/exoncap/Mygal/Testing')
-
+# exon_aln_filter(exonaln_folder='/Users/josec/Desktop/exoncap/Mygal/ExonAlns', filtered_exonaln_folder='/Users/josec/Desktop/exoncap/Mygal/ExonAlns_Filtered', min_exon_length=80, min_taxoncoverage=4, min_PID=0)
 
 

@@ -63,7 +63,8 @@ def writer(target_dict,gene_out_folder):
     vlist = target_dict['Vulgar']
     CDS = target_dict['CDS']
     try:
-        gene = target_dict['Target'].split("cds_")[1].split(".")[0]
+        gene_raw = target_dict['Target'].split("cds_")[1].split("_")
+        gene = f"{gene_raw[0]}_{gene_raw[1]}"
     except:
         gene = target_dict['Target']
     exonseq_list = splitter(CDS, vlist)
@@ -76,7 +77,7 @@ def writer(target_dict,gene_out_folder):
 
 
 def vulgarity_filter(infile):
-    gene_out_folder = Path(infile).parent/'exons'
+    gene_out_folder = Path(infile).parent/'Exons'
     gene_out_folder.mkdir(exist_ok=True)
     target_list = openfile(infile)
     for target in target_list:
