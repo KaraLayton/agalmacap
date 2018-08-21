@@ -18,7 +18,6 @@ This chops up the sequences in the exonerate_outfile into exons and saves them (
 EXONSEQUENCE
 
 """
-
 def openfile(infile):
     # Read exonerate output and make list of output for each target (gene)
     # The results are stored in target_list
@@ -56,7 +55,7 @@ def splitter(CDS, vlist):
     return exonseq_list
 
 
-def writer(target_dict,gene_out_folder):
+def writer(target_dict, gene_out_folder):
     # Writes the exon sequences into the outfile.fa
     # Each exon sequence is named by the order in the target (gene)
     outstring = ""
@@ -65,7 +64,7 @@ def writer(target_dict,gene_out_folder):
     try:
         gene_raw = target_dict['Target'].split("cds_")[1].split("_")
         gene = f"{gene_raw[0]}_{gene_raw[1]}"
-    except:
+    except KeyError:
         gene = target_dict['Target']
     exonseq_list = splitter(CDS, vlist)
     out_path = str(gene_out_folder/f"{gene}.fas")
@@ -87,15 +86,15 @@ def vulgarity_filter(infile):
             # Filter to remove low ID hits
             if float(target_dict['Percent']) < 98:
                 continue
-            outstring = writer(target_dict,gene_out_folder)
-    return
+            outstring = writer(target_dict, gene_out_folder)
+    return outstring
 
 
 def main():
     # Engine for the program.
     args = sys.argv[1:]
-    #args=['--in','/Users/josec/Desktop/NudiPreBait/NudiSilicoTest/test444out.txt'] #For testing
-    #Print usage if no input is put in by user
+    # args=['--in','/Users/josec/Desktop/NudiPreBait/NudiSilicoTest/test444out.txt'] #For testing
+    # Print usage if no input is put in by user
     if not args:
         print(usage)
         sys.exit(1)
