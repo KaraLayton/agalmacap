@@ -18,6 +18,8 @@ This chops up the sequences in the exonerate_outfile into exons and saves them (
 EXONSEQUENCE
 
 """
+
+
 def openfile(infile):
     # Read exonerate output and make list of output for each target (gene)
     # The results are stored in target_list

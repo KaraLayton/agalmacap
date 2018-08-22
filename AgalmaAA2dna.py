@@ -6,6 +6,17 @@ import sys
 from Bio import SeqIO
 from pathlib import Path
 
+usage = """Agalma finds homologous genes from RNA-seq data. The RNA-seq assemblies (transcriptomes)
+are DNA fasta files and the homologous gene alignments are amino acid fasta alignments.
+The purpose of AgalmaAA2dna is to convert the amino acid homologous gene alignments into dna fasta files
+named after the RefSeq Protein ID that they annotate too. A copy of the RefSeqProtein CDS from the reference
+genome is also inlcuded in the DNA fasta file.
+A reciprical blast of the AA sequence to the correspoding DNA assembly retrieves the transcriptome data
+and the RefSeq CDS is retrieved by the fasta header info.
+The output files for each gene (annotated by RefSeqProtID are saved here: alnaa_folder/DNAbyLoci/RefSeqProtIDxx.fas
+Not a stand-alone module.
+"""
+
 
 def run_command(command, command_out_path=None):
     """Runs command with subprocess library.
@@ -42,7 +53,7 @@ def dna_or_aa(seq_file):
     return alphabet
 
 
-def blaster(threads, query, blastdb_prefix, blast_out_path=None):
+def blaster(num_threads, query, blastdb_prefix, blast_out_path=None):
     """Runs a blast search and returns the names of the top hit sequences from the blast database
     (min eval = 1e-50)
 
@@ -74,7 +85,7 @@ def blaster(threads, query, blastdb_prefix, blast_out_path=None):
         dbcommand = f"makeblastdb -in {blastdb_prefix} -dbtype {dbtype}"
         run_command(dbcommand)
     # Run Blast
-    bcommand = f"{blast_prog} -query {query} -db {blastdb_prefix} -evalue 1e-50 -outfmt '6 qseqid sseqid' -max_target_seqs 1 -max_hsps 1 -num_threads {threads}"
+    bcommand = f"{blast_prog} -query {query} -db {blastdb_prefix} -evalue 1e-50 -outfmt '6 qseqid sseqid' -max_target_seqs 1 -max_hsps 1 -num_threads {num_threads}"
     blast_output = run_command(bcommand, command_out_path=blast_out_path)
     return blast_output
 
@@ -112,8 +123,7 @@ def codex_file_reader(codex_file):
 def groupagalmabytxtm(codex_dict, alnaa_folder, txtm):
     """Saves the sequence that has the same header as txtm from each
     alignment in alnaa_folder to a file named "AAbytxtm/<txtm>.fas"
-    Strips the gaps from the AA sequences and removes seqs shorter than 50AA
-    See agalmaaa2txtmdna for more info"""
+    Strips the gaps from the AA sequences and removes seqs shorter than 50AA"""
     txtm_aaseq_dict = {}
     for agalID, RefseqProtID in codex_dict.items():
         agal_aln_path = str(Path(alnaa_folder)/f"{agalID}.fas")
@@ -144,8 +154,7 @@ def fetchseq(names_tofetch, seqfile):
 def blastbytxtm(alnaa_folder, txtm_folder, txtm):
     """Each amino acid sequence is blasted to the DNA transcriptome assembly.
     The results are written to the  txtm_dna_out_folder in fasta format.
-    The fasta headers are '>txtm-loci' to be legible for cat_by_gene()
-    See agalmaaa2txtmdna for more info"""
+    The fasta headers are '>txtm-loci' to be legible for cat_by_gene()"""
     query_path = Path(alnaa_folder)/"AAbytxtm"
     blastdb_path = str(Path(txtm_folder)/f"{txtm}.fas")
     blast_out = str(query_path/f"{txtm}_recipblast.txt")
