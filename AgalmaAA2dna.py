@@ -5,15 +5,20 @@ import sys
 
 from Bio import SeqIO
 from pathlib import Path
+from textwrap import dedent
 
-usage = """Agalma finds homologous genes from RNA-seq data. The RNA-seq assemblies (transcriptomes)
+
+helpful_text = """Agalma finds homologous genes from RNA-seq data. The RNA-seq assemblies (transcriptomes)
 are DNA fasta files and the homologous gene alignments are amino acid fasta alignments.
-The purpose of AgalmaAA2dna is to convert the amino acid homologous gene alignments into dna fasta files
-named after the RefSeq Protein ID that they annotate too. A copy of the RefSeqProtein CDS from the reference
-genome is also inlcuded in the DNA fasta file.
-A reciprical blast of the AA sequence to the correspoding DNA assembly retrieves the transcriptome data
+The purpose of AgalmaAA2dna is to convert the amino acid homologous gene
+alignments into dna fasta filesnamed after the RefSeq Protein ID that they
+annotate too. A copy of the RefSeqProtein CDS from the reference
+genome is also inlcuded in the DNA fasta file.A reciprical blast of
+the AA sequence to the correspoding DNA assembly retrieves the transcriptome data
 and the RefSeq CDS is retrieved by the fasta header info.
-The output files for each gene (annotated by RefSeqProtID are saved here: alnaa_folder/DNAbyLoci/RefSeqProtIDxx.fas
+The output files for each gene (annotated by RefSeqProtID are saved here:
+alnaa_folder/DNAbyLoci/RefSeqProtIDxx.fas
+
 Not a stand-alone module.
 """
 
@@ -85,7 +90,15 @@ def blaster(num_threads, query, blastdb_prefix, blast_out_path=None):
         dbcommand = f"makeblastdb -in {blastdb_prefix} -dbtype {dbtype}"
         run_command(dbcommand)
     # Run Blast
-    bcommand = f"{blast_prog} -query {query} -db {blastdb_prefix} -evalue 1e-50 -outfmt '6 qseqid sseqid' -max_target_seqs 1 -max_hsps 1 -num_threads {num_threads}"
+    bcommand = dedent(f'''
+                        {blast_prog} -query {query}
+                        -db {blastdb_prefix}
+                        -evalue 1e-50
+                        -outfmt '6 qseqid sseqid'
+                        -max_target_seqs 1
+                        -max_hsps 1
+                        -num_threads {num_threads}
+                        ''').replace('\n', ' ')
     blast_output = run_command(bcommand, command_out_path=blast_out_path)
     return blast_output
 
@@ -159,7 +172,9 @@ def blastbytxtm(alnaa_folder, txtm_folder, txtm):
     blastdb_path = str(Path(txtm_folder)/f"{txtm}.fas")
     blast_out = str(query_path/f"{txtm}_recipblast.txt")
     # This step takes 10 min.
-    blaster(threads=7, query=str(query_path/f"{txtm}.fas"), blastdb_prefix=blastdb_path, blast_out_path=blast_out)
+    blaster(
+            threads=7, query=str(query_path/f"{txtm}.fas"),
+            blastdb_prefix=blastdb_path, blast_out_path=blast_out)
     # store blast results as dictionary
     rblast_dict = {}
     with open(blast_out, 'r') as rblastout_handle:
@@ -198,7 +213,7 @@ def cat_by_gene(txtm_list, loci_list, in_path, file_ending, out_path):
     return
 
 
-def agalmaaa2txtmdna(codex_file, alnaa_folder, txtm_folder):
+def agalmaaa2txtmdna(codex_file, alnaa_folder, txtm_folder, loci_dna_out_folder):
     """Starting from Agalma AA loci alignments, this will blast each AA sequence to
     the transcriptome it came from and will save the results by loci as DNA fasta files.
 
@@ -225,7 +240,9 @@ def agalmaaa2txtmdna(codex_file, alnaa_folder, txtm_folder):
         groupagalmabytxtm(codex_dict, alnaa_folder, txtm)
         txtm_dna_out_folder = blastbytxtm(alnaa_folder, txtm_folder, txtm)
     # writes sequences with fasta header of txtm and the fasta file name is the loci name
-    loci_dna_out_folder = Path(alnaa_folder)/"DNAbyLoci"
-    loci_dna_out_folder.mkdir(exist_ok=True)
-    cat_by_gene(txtm_list=txtms, loci_list=codex_dict.values(), in_path=txtm_dna_out_folder, file_ending="_DNA.fas", out_path=loci_dna_out_folder)
+    Path(loci_dna_out_folder).mkdir(exist_ok=True)
+    cat_by_gene(
+                txtm_list=txtms, loci_list=codex_dict.values(),
+                in_path=txtm_dna_out_folder, file_ending="_DNA.fas",
+                out_path=loci_dna_out_folder)
     return

@@ -13,7 +13,8 @@ example exonerate command:
 exonerate --model est2genome Test44.fasta /Users/josec/Desktop/NudiSilicoTest/Exonerate/acl_ref_AplCal3.0_chrUn.fa -Q DNA -T DNA --showvulgar F --showalignment F --percent 90 --verbose 0 --ryo '%qi\t%pi\t%qas\t%V\tEND\n' --fsmmemory 20G --bestn 1 > exonerate_outfile.txt
 
 
-This chops up the sequences in the exonerate_outfile into exons and saves them (if > 200bp) as a fasta with headers:
+This chops up the sequences in the exonerate_outfile into exons and saves them (if > 200bp)
+as a fasta with headers:
 >Gene_exonNumber
 EXONSEQUENCE
 
@@ -34,7 +35,7 @@ def parser(target):
     tlist = [x.replace('\n', '') for x in target.split('\t')]
     target_dict['Target'] = tlist[0]
     target_dict['Percent'] = tlist[1]
-    target_dict['CDS'] = tlist[2]
+    target_dict['cds'] = tlist[2]
     # Extract exon lengths from vulgar output, then add to target_dict
     # Each exon length is preceded by 'M '
     # Exon lengths are all in sequential list.
@@ -45,14 +46,14 @@ def parser(target):
     return target_dict
 
 
-def splitter(CDS, vlist):
-    # Cuts up the CDS into exon sequences and stores them in a list
+def splitter(cds, vlist):
+    # Cuts up the cds into exon sequences and stores them in a list
     # This is done from the vulgar list of exon lengths
-    # CDS is the sequence of concatenated exons
+    # cds is the sequence of concatenated exons
     counter = 0
     exonseq_list = []
     for v in vlist:
-        exonseq_list.append(CDS[counter:counter + v])
+        exonseq_list.append(cds[counter:counter + v])
         counter += v
     return exonseq_list
 
@@ -62,15 +63,15 @@ def writer(target_dict, gene_out_folder):
     # Each exon sequence is named by the order in the target (gene)
     outstring = ""
     vlist = target_dict['Vulgar']
-    CDS = target_dict['CDS']
+    cds = target_dict['cds']
     try:
         gene_raw = target_dict['Target'].split("cds_")[1].split("_")
         gene = f"{gene_raw[0]}_{gene_raw[1]}"
     except KeyError:
         gene = target_dict['Target']
-    exonseq_list = splitter(CDS, vlist)
+    exonseq_list = splitter(cds, vlist)
     out_path = str(gene_out_folder/f"{gene}.fas")
-    with open(out_path,'w') as out_handle:
+    with open(out_path, 'w') as out_handle:
         for exon_number, exonseq in enumerate(exonseq_list):
             outstring += f">{gene}_{exon_number}\n{exonseq}\n"
         out_handle.write(outstring)
