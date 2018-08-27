@@ -25,7 +25,7 @@ Not a stand-alone module.
 
 def run_command(command, command_out_path=None):
     """Runs command with subprocess library.
-    Prints error if commmand did not run.
+    Prints error if command did not run.
     if outpath given it will print output there, otherwise this function returns it. """
     command_output = subprocess.getstatusoutput(command)
     if command_output[0]:
@@ -164,7 +164,7 @@ def fetchseq(names_tofetch, seqfile):
     return fetched_records
 
 
-def blastbytxtm(alnaa_folder, txtm_folder, txtm):
+def blastbytxtm(alnaa_folder, txtm_folder, txtm, num_threads):
     """Each amino acid sequence is blasted to the DNA transcriptome assembly.
     The results are written to the  txtm_dna_out_folder in fasta format.
     The fasta headers are '>txtm-loci' to be legible for cat_by_gene()"""
@@ -173,7 +173,7 @@ def blastbytxtm(alnaa_folder, txtm_folder, txtm):
     blast_out = str(query_path/f"{txtm}_recipblast.txt")
     # This step takes 10 min.
     blaster(
-            threads=7, query=str(query_path/f"{txtm}.fas"),
+            num_threads=7, query=str(query_path/f"{txtm}.fas"),
             blastdb_prefix=blastdb_path, blast_out_path=blast_out)
     # store blast results as dictionary
     rblast_dict = {}
@@ -213,7 +213,7 @@ def cat_by_gene(txtm_list, loci_list, in_path, file_ending, out_path):
     return
 
 
-def agalmaaa2txtmdna(codex_file, alnaa_folder, txtm_folder, loci_dna_out_folder):
+def agalmaaa2txtmdna(codex_file, alnaa_folder, txtm_folder, loci_dna_out_folder, num_threads):
     """Starting from Agalma AA loci alignments, this will blast each AA sequence to
     the transcriptome it came from and will save the results by loci as DNA fasta files.
 
@@ -238,7 +238,7 @@ def agalmaaa2txtmdna(codex_file, alnaa_folder, txtm_folder, loci_dna_out_folder)
     # Make new fasta of agalma output grouped by transcriptome, strips gaps
     for txtm in txtms:
         groupagalmabytxtm(codex_dict, alnaa_folder, txtm)
-        txtm_dna_out_folder = blastbytxtm(alnaa_folder, txtm_folder, txtm)
+        txtm_dna_out_folder = blastbytxtm(alnaa_folder, txtm_folder, txtm, num_threads)
     # writes sequences with fasta header of txtm and the fasta file name is the loci name
     Path(loci_dna_out_folder).mkdir(exist_ok=True)
     cat_by_gene(
@@ -246,3 +246,13 @@ def agalmaaa2txtmdna(codex_file, alnaa_folder, txtm_folder, loci_dna_out_folder)
                 in_path=txtm_dna_out_folder, file_ending="_DNA.fas",
                 out_path=loci_dna_out_folder)
     return
+
+
+def main():
+    #Not meant to be run as a stand-alone
+    print(helpful_text)
+    return
+
+
+if __name__ == '__main__':
+    main()

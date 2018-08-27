@@ -8,12 +8,12 @@ usage = """
 Usage: VulgarityFilter.py --in exonerate_outfile.txt
 
 Parses the output of exonerate with: --ryo '%qi\t%pi\t%qas\t%V\tEND\n'
-output: inputname.fa of a fasta with each exon listed as a seperate sequence IF the exon is >200bp.
+output: inputname.fa of a fasta with each exon listed as a seperate sequence
 example exonerate command:
 exonerate --model est2genome Test44.fasta /Users/josec/Desktop/NudiSilicoTest/Exonerate/acl_ref_AplCal3.0_chrUn.fa -Q DNA -T DNA --showvulgar F --showalignment F --percent 90 --verbose 0 --ryo '%qi\t%pi\t%qas\t%V\tEND\n' --fsmmemory 20G --bestn 1 > exonerate_outfile.txt
 
 
-This chops up the sequences in the exonerate_outfile into exons and saves them (if > 200bp)
+This chops up the sequences in the exonerate_outfile into exons and saves them
 as a fasta with headers:
 >Gene_exonNumber
 EXONSEQUENCE
@@ -78,9 +78,7 @@ def writer(target_dict, gene_out_folder):
     return outstring
 
 
-def vulgarity_filter(infile):
-    gene_out_folder = Path(infile).parent/'Exons'
-    gene_out_folder.mkdir(exist_ok=True)
+def vulgarity_filter(infile,gene_out_folder):
     target_list = openfile(infile)
     for target in target_list:
         # check if target file is blank
@@ -89,7 +87,7 @@ def vulgarity_filter(infile):
             # Filter to remove low ID hits
             if float(target_dict['Percent']) < 98:
                 continue
-            outstring = writer(target_dict, gene_out_folder)
+            outstring = writer(target_dict, Path(gene_out_folder))
     return outstring
 
 

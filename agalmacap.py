@@ -2,6 +2,7 @@
 
 import re
 import subprocess
+import sys
 
 from Bio import AlignIO
 from Bio import SeqIO
@@ -9,11 +10,13 @@ from Bio.Align import AlignInfo
 from multiprocessing import Pool
 from pathlib import Path
 from textwrap import dedent
+from timeit import default_timer as timer
 
 from AgalmaAA2dna import agalmaaa2txtmdna, codex_file_reader, blaster
 from VulgarityFilter import vulgarity_filter
 
 usage = """
+python3 agalmacap.py --param parameterfile.txt
 """
 
 
@@ -253,14 +256,40 @@ def cds_loci_merger(codex_file, cds_file, dnabyloci_folder, dnacdsbyloci_folder)
     return
 
 
-def cut_genealns_to_exon_alns(codex_file, cds_exon_folder, cds_loci_folder, exonaln_foler):
+def gene_aligner(dnacdsbyloci_folder,locialn_folder,num_threads):
+    """Creates a gene alignment for each fasta file in the
+    dnacdsbyloci_folder. The alignment is simmilar to muscle
+    output but run with mafft. See lessgappy_mafter for more info.
+    """
+    to_aln_files = [x for x in Path(dnacdsbyloci_folder).iterdir() if '.fa' in x.suffix]
+    for loci in to_aln_files:
+        lessgappy_maffter(
+                            fasta_file_path=loci,
+                            out_file_path=Path(locialn_folder)/f"{loci.name}",
+                            num_threads=num_threads)
+    return
+
+
+def clean_and_exonerate(genome_fasta,target_cds,intronerator_out_path,cds_exon_folder,num_threads):
+    """
+    """
+    # This step takes a whiiiiiiiiiiiiile!! 3 days
+    intronerator_out = intronerator(num_threads=num_threads, genome_fasta=genome_fasta, target_cds=target_cds)
+    with open(intronerator_out_path, 'w') as out_handle:
+        for item in intronerator_out:
+            out_handle.write(item)
+    vulgarity_filter(intronerator_out_path,cds_exon_folder)
+    return
+
+
+def cut_genealns_to_exon_alns(codex_file, cds_exon_folder, loci_alns, exonaln_foler):
     """ For each loci in the codex, this will cut the loci alignment by exons
     and save it to exonaln_folder as Loci_ExonNumber.fas
     """
     good_loci = codex_file_reader(codex_file=codex_file).values()
     for loci in good_loci:
         cds_exon_file = Path(cds_exon_folder)/f"{loci}.fas"
-        loci_aln_file = Path(cds_loci_folder)/f"{loci}.fas"
+        loci_aln_file = Path(loci_alns)/f"{loci}.fas"
         if cds_exon_file.exists() and loci_aln_file.exists():
             loci_partitions = generate_partitions(
                                                 substring_fasta=str(cds_exon_file),
@@ -307,7 +336,8 @@ def param_reader(paramfile_path):
             'refseqprotein_path',
             'supermatrix_aln_type',
             'threads',
-            'min_taxoncov']
+            'min_taxoncov',
+            'min_exon_length']
     with open(paramfile_path, 'r') as param_handle:
         values = [p.split('#')[0].strip() for p in param_handle.readlines()]
     param = dict(zip(keys, values))
@@ -326,24 +356,30 @@ def outdir_creator(param):
 
     # make scratch folder for intermediate files
     scratch = basepath/'Agalmacap_scratch_files'
-    scratch.mkdir(exist_ok=True)
+    try:
+        scratch.mkdir(exist_ok=False)
+    except FileExistsError:
+        print(f"delete folder: {scratch} ")
+        # scratch2 = basepath/'OLD_Agalmacap_scratch_files'
+        # scratch.replace(scratch2)
+        # scratch.mkdir(exist_ok=False)
     aa_loci = scratch/'1_aa_aln'            # Agalma supermatrix cut into gene alignments. Each agalma gene is now called a loci
     fil_aln_loci = scratch/'2_aa_faln'      # AA loci alingments with min_taxoncov filtered applied
     cons_aa_loci = scratch/'3_aa_cons.fas'  # Consensus seqs of each AA loci alignment
-    codex_path = '4_codex.txt'              # Consensus of agalma loci blasted to RefSeq AA. Used to annotate each loci as a RefseqProtein ID
+    codex_path = scratch/'4_codex.txt'              # Consensus of agalma loci blasted to RefSeq AA. Used to annotate each loci as a RefseqProtein ID
     aa_loci_txtm = scratch/''               # AA sequences from gene alignments grouped by transcriptome
     dna_loci = scratch/'5_dna_loci'         # DNA sequences of each loci
     refseqcds_loci = scratch/'6_refseqcds_loci.fas'             # All of the RefSeq CDS that were in the codex (ie all the CDS that agalma identified as homologous loci)
-    dnacds_loci = scratch/''                # DNA sequences of each loci with the RefSeqCDS added
-    intronerator_out_path = scratch/''      # Exonerate output file listing locations of introns to be parsed by vulgarityfilter
-    cds_exon_folder = scratch/''            # Each Refseq CDS loci cut into exons
+    dnacds_loci = scratch/'7_dnacds'                # DNA sequences of each loci with the RefSeqCDS added
+    intronerator_out_path = scratch/'8_intronerator_out.txt'      # Exonerate output file listing locations of introns to be parsed by vulgarityfilter
+    cds_exon_folder = scratch/'9_cds_exon_folder'            # Each Refseq CDS loci cut into exons
 
     # make directory for output of pipeline
     alignments = basepath/'Agalmacap_output_alignments'
     alignments.mkdir(exist_ok=True)
-    loci_alns = alignments/''                # Alignments of each loci with the RefSeqCDS as the first sequence. 
-    exon_alns = alignments/''                # Loci alignments cut by the intron boundries of the RefSeqCDS genome.
-    exon_alns_filtered = alignments/''       # Exon alignments after the min length and min taxon coverage filters are applied
+    loci_alns = alignments/'loci_alns'                # Alignments of each loci with the RefSeqCDS as the first sequence. 
+    exon_alns = alignments/'exon_alns'                # Loci alignments cut by the intron boundries of the RefSeqCDS genome.
+    exon_alns_filtered = alignments/'exon_alns_filtered'       # Exon alignments after the min length and min taxon coverage filters are applied
 
     keys = [
             'aa_loci',
@@ -375,7 +411,7 @@ def outdir_creator(param):
                     exon_alns_filtered]
     values = []
     for path in path_values:
-        if not path.suffix:
+        if not Path(path).suffix:
             path.mkdir(exist_ok=True)
         values.append(str(path))
     outdir = dict(zip(keys, values))
@@ -383,58 +419,103 @@ def outdir_creator(param):
     return outdir
 
 
-def pipeline():
-    param = param_reader('/Users/josec/Desktop/exoncap/Mygal/AgalmacapTesting/Param-test1.txt')
+def pipeline(param):
+    param = param_reader(param)
     outdir = outdir_creator(param)
 
     partitions = raxpartition_reader(part_file=param['aglama_partition_file'])
 
     alncutter(
-            partitions=partitions, aln_file=param['agalma_supermatrix_file'],
-            aln_type=param['supermatrix_aln_type'], genealn_outdir=outdir['aa_loci'])
+                partitions=partitions,
+                aln_file=param['agalma_supermatrix_file'],
+                aln_type=param['supermatrix_aln_type'],
+                genealn_outdir=outdir['aa_loci'])
 
     aln_filter(
-            aln_folder=outdir['aa_loci'], filtered_aln_folder=outdir['fil_aln_loci'],
-            min_exon_length=0, min_taxoncov=param['min_taxoncov'])
+                aln_folder=outdir['aa_loci'],
+                filtered_aln_folder=outdir['fil_aln_loci'],
+                min_exon_length=0,
+                min_taxoncov=param['min_taxoncov'])
 
     consensus_generator(
-                        aln_folder=outdir['fil_aln_loci'], aln_type='fasta',
+                        aln_folder=outdir['fil_aln_loci'],
+                        aln_type='fasta',
                         consensus_file=outdir['cons_aa_loci'])
     # Genrate Codex
     blaster(
-            num_threads=param['threads'], query=outdir['cons_aa_loci'],
-            blastdb_prefix=param['refseqprotein_path'], blast_out_path=outdir['codex_path'])
+            num_threads=param['threads'],
+            query=outdir['cons_aa_loci'],
+            blastdb_prefix=param['refseqprotein_path'],
+            blast_out_path=outdir['codex_path'])
 
     # DONT run agalmaaa2txtmdna multiple times because it appends to sequence files in DNAbyLoci
     # ie it does not overwrite.
     agalmaaa2txtmdna(
                     codex_file=outdir['codex_path'],
-                    alnaa_folder='/Users/josec/Desktop/exoncap/Mygal/alns/',
+                    alnaa_folder=outdir['fil_aln_loci'],
                     txtm_folder=param['transcriptome_folder'],
-                    loci_dna_out_folder=outdir['dna_loci'])
+                    loci_dna_out_folder=outdir['dna_loci'],
+                    num_threads=param['threads'])
     # Generate Gene alignments with refseq and minimal gaps
     fetch_refseqcds(
                     refseqcds=param['refseqcds_path'],
                     codex_file=outdir['codex_path'],
                     outfile=outdir['refseqcds_loci'])
-    # cds_loci_merger(codex_file=codex_path, cds_file='/Users/josec/Desktop/exoncap/Mygal/refseqcds_loci.fas', dnabyloci_folder='/Users/josec/Desktop/exoncap/Mygal/alns/DNAbyLoci',dnacdsbyloci_folder='/Users/josec/Desktop/exoncap/Mygal/alns/DNAcdsbyLoci')
-    # to_aln_files = [x for x in Path('/Users/josec/Desktop/exoncap/Mygal/alns/DNAcdsbyLoci').iterdir() if '.fa' in x.suffix]
-    # aln = Path("/Users/josec/Desktop/exoncap/Mygal/loci_alns")
-    # for loci in to_aln_files:
-    #     lessgappy_maffter(fasta_file_path=loci, out_file_path=aln/f"{loci.name}",num_threads=threads)
+    
+    cds_loci_merger(
+                    codex_file=outdir['codex_path'],
+                    cds_file=outdir['refseqcds_loci'],
+                    dnabyloci_folder=outdir['dna_loci'],
+                    dnacdsbyloci_folder=outdir['dnacds_loci'])
+
+    gene_aligner(
+                dnacdsbyloci_folder=outdir['dnacds_loci'],
+                locialn_folder=outdir['loci_alns'],
+                num_threads=param['threads'])
+    
+    clean_and_exonerate(
+                        genome_fasta=param['refseqgenome_path'],
+                        target_cds=outdir['refseqcds_loci'],
+                        intronerator_out_path=outdir['intronerator_out_path'],
+                        cds_exon_folder=outdir['cds_exon_folder'],
+                        num_threads=param['threads'])
+    
+    cut_genealns_to_exon_alns(
+                            codex_file=outdir['codex_path'],
+                            cds_exon_folder=outdir['cds_exon_folder'],
+                            loci_alns=outdir['loci_alns'],
+                            exonaln_foler=outdir['exon_alns'])
+
+    aln_filter(
+                aln_folder=outdir['exon_alns'],
+                filtered_aln_folder=outdir['exon_alns_filtered'],
+                min_exon_length=param['min_exon_length'],
+                min_taxoncov=param['min_taxoncov'])
     return
 
-   
-pipeline()
 
-# # This step takes a whiiiiiiiiiiiiile!! 3 days
-# intronerator_out = intronerator(num_threads=threads, genome_fasta=refseqgenome_path, target_cds='/Users/josec/Desktop/exoncap/Mygal/refseqcds_loci.fas')
-# intronerator_out_path = '/Users/josec/Desktop/exoncap/Mygal/refseqcds_intronerator_out_filtered.txt'
-# with open(intronerator_out_path, 'w') as out_handle:
-#     for item in intronerator_out:
-#         out_handle.write(item)
-# VulgarityFilter.vulgarity_filter(intronerator_out_path)
 
-# cut_genealns_to_exon_alns(codex_file=codex_path, cds_exon_folder='/Users/josec/Desktop/exoncap/Mygal/Exons', cds_loci_folder='/Users/josec/Desktop/exoncap/Mygal/loci_alns', exonaln_foler='/Users/josec/Desktop/exoncap/Mygal/exon_alns')
 
-# aln_filter(aln_folder='/Users/josec/Desktop/exoncap/Mygal/exon_alns', filtered_aln_folder='/Users/josec/Desktop/exoncap/Mygal/exon_alns_filtered', min_exon_length=80, min_taxoncov=4)
+# pipeline(param='/Users/josec/Desktop/exoncap/Mygal/AgalmacapTesting/Param-test1.txt'
+
+
+def main():
+    # Engine for the program.
+    args = sys.argv[1:]
+    # Print usage if no input is put in by user
+    if not args:
+        print(usage)
+        sys.exit(1)
+    if args[0] == '--param':
+        param = args[1]
+
+    start = timer()
+    pipeline(param=param)
+    end = timer()
+    print(end - start)
+
+    return
+
+
+if __name__ == '__main__':
+    main()
