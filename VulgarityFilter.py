@@ -78,7 +78,7 @@ def writer(target_dict, gene_out_folder):
     return outstring
 
 
-def vulgarity_filter(infile,gene_out_folder):
+def vulgarity_filter(infile, gene_out_folder):
     target_list = openfile(infile)
     for target in target_list:
         # check if target file is blank

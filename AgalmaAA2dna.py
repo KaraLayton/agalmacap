@@ -104,32 +104,16 @@ def blaster(num_threads, query, blastdb_prefix, blast_out_path=None):
 
 
 def codex_file_reader(codex_file):
-    """The codex dictionary that this function returns is the blast result of the
-    agalma alignment reference to the reference genome CDS.
+    """The codex dictionary is the blast result of the
+    agalma alignment consensus to the reference genome Protein fasta.
     The dicitonary key is the agalma gene alignment ID and the
     dictionary value is the RefSeq Protein ID from the reference genome.
-
-    This function removes any agalma genes that blast to the same
-    RefSeq gene. This ensures that we do not design baits that target multiple
-    portions of the genome.
     """
-    raw_list = []
-    bad_list = []
     codex_dict = {}
     with open(codex_file) as f:
         for line in f:
-            raw_list.append(line.split()[1])
-
-    for item in raw_list:
-        if raw_list.count(item) > 1:
-            if item not in bad_list:
-                bad_list.append(item)
-
-    with open(codex_file) as f:
-        for line in f:
             (agalID, RefseqProtID) = line.split()
-            if RefseqProtID not in bad_list:
-                codex_dict[agalID] = RefseqProtID
+            codex_dict[agalID] = RefseqProtID
     return codex_dict
 
 
@@ -249,7 +233,7 @@ def agalmaaa2txtmdna(codex_file, alnaa_folder, txtm_folder, loci_dna_out_folder,
 
 
 def main():
-    #Not meant to be run as a stand-alone
+    # Not meant to be run as a stand-alone
     print(helpful_text)
     return
 
