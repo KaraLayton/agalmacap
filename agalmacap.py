@@ -47,7 +47,7 @@ def raxpartition_reader(part_file):
     return partitions
 
 
-def alncutter(partitions, aln_file, aln_type, genealn_outdir):
+def alncutter(partitions, aln_file, aln_type, genealn_outdir,write_ref):
     """Divides the aln_file into sub-alignments based on positions in partition list
     Writes gene alignments to genealn_outdirectory as fasta files.
     Ignores sequences made entirely of gaps
@@ -324,24 +324,32 @@ def cut_genealns_to_exon_alns(codex_file, cds_exon_folder, loci_alns, exonaln_fo
     return
 
 
-def aln_filter(aln_folder, filtered_aln_folder, min_exon_length=0, min_taxoncov=0):
+def aln_filter(aln_folder, filtered_aln_folder, write_ref, min_exon_length=0, min_taxoncov=0):
     """Reads all of the fasta sequences in the aln_folder and saves them to the filtered_aln_folder
     if they are longer than the min_exon_length AND have more sequences in the alignment than
     min_taxoncov. The filtered_aln_folder is created if it does not exist.
+    If write_ref='True' the reference CDS sequence will be retained in final alingment.
     """
     Path(filtered_aln_folder).mkdir(exist_ok=True)
     efls = [str(exon_file) for exon_file in Path(aln_folder).iterdir() if '.fa' in exon_file.suffix]
-    exons2write = []
     for exon_file in efls:
         records = list(SeqIO.parse(exon_file, 'fasta'))
         if len(records) > 0:
             if len(records) >= min_taxoncov \
                         and len(records[0].seq) >= min_exon_length:
-                exons2write.append(exon_file)
                 outfile_stem = Path(exon_file).name
                 out_path = Path(filtered_aln_folder)/outfile_stem
-                with open(out_path, 'w') as out_handle:
-                    SeqIO.write(records, out_handle, 'fasta')
+                if write_ref == 'True':
+                    with open(out_path, 'w') as out_handle:
+                        SeqIO.write(records, out_handle, 'fasta')
+                elif write_ref == 'False':
+                    recs_to_write = [rec for rec in records if '_cds_' not in rec.name]
+                    with open(out_path, 'w') as out_handle:
+                        SeqIO.write(recs_to_write, out_handle, 'fasta')
+                else:
+                    print('Error reading write_ref variable')
+                    sys.exit()
+
     return
 
 
@@ -361,7 +369,8 @@ def param_reader(paramfile_path):
             'supermatrix_aln_type',
             'threads',
             'min_taxoncov',
-            'min_exon_length']
+            'min_exon_length',
+            'write_ref']
     with open(paramfile_path, 'r') as param_handle:
         values = [p.split('#')[0].strip() for p in param_handle.readlines()]
     param = dict(zip(keys, values))
@@ -457,7 +466,8 @@ def pipeline(param):
                 aln_folder=outdir['aa_loci'],
                 filtered_aln_folder=outdir['fil_aln_loci'],
                 min_exon_length=0,
-                min_taxoncov=param['min_taxoncov'])
+                min_taxoncov=param['min_taxoncov'],
+                write_ref=True)
 
     consensus_generator(
                         aln_folder=outdir['fil_aln_loci'],
@@ -510,7 +520,8 @@ def pipeline(param):
                 aln_folder=outdir['exon_alns'],
                 filtered_aln_folder=outdir['exon_alns_filtered'],
                 min_exon_length=param['min_exon_length'],
-                min_taxoncov=param['min_taxoncov'])
+                min_taxoncov=param['min_taxoncov'],
+                write_ref=param['write_ref'])
     return
 
 

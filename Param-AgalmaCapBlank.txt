@@ -9,4 +9,4 @@
 # threads: Number of threads.
 # min_taxoncov: Minimum number of transcriptomes 
 # min_exon_length: Minimum length of exon for it to be retained.
-
+# write_ref: boolean of if the reference sequence should be included in the exon_alns_filtered ['True' or 'False']
