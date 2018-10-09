@@ -13,7 +13,7 @@ are DNA fasta files and the homologous gene alignments are amino acid fasta alig
 The purpose of AgalmaAA2dna is to convert the amino acid homologous gene
 alignments into dna fasta filesnamed after the RefSeq Protein ID that they
 annotate too. A copy of the RefSeqProtein CDS from the reference
-genome is also inlcuded in the DNA fasta file.A reciprical blast of
+genome is also inlcuded in the DNA fasta file if write_ref option specified. A reciprical blast of
 the AA sequence to the correspoding DNA assembly retrieves the transcriptome data
 and the RefSeq CDS is retrieved by the fasta header info.
 The output files for each gene (annotated by RefSeqProtID are saved here:

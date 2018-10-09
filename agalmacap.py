@@ -10,7 +10,7 @@ from Bio.Align import AlignInfo
 from multiprocessing import Pool
 from pathlib import Path
 from textwrap import dedent
-from timeit import default_timer as timer
+# from timeit import default_timer as timer
 
 from AgalmaAA2dna import agalmaaa2txtmdna, codex_file_reader, blaster
 from VulgarityFilter import vulgarity_filter
@@ -538,10 +538,10 @@ def main():
     if args[0] == '--param':
         param = args[1]
 
-    start = timer()
+    # start = timer()
     pipeline(param=param)
-    end = timer()
-    print(end - start)
+    # end = timer()
+    # print(end - start)
 
     return
 
