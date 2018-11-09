@@ -1,12 +1,12 @@
 # agalmacap
 
 
-##Usage:
+## Usage:
 ```
 python3 agalmacap.py --param parameterfile.txt
 ```
 
-##Description:
+## Description:
 This pipeline automates the steps required to generate exon alignments from Agalma amino acid (AA) data. These exon alignments are DNA sequences of homologous genes identified from an Agalma transcriptome search that are cut at the intron sites of the closest reference genome. 
 
 
