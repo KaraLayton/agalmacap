@@ -41,9 +41,11 @@ def dna_or_aa(seq_file):
     """Reads 5 lines of fasta seq_file and guesses if DNA or RNA.
     Exits if invalid residues are present"""
     records = SeqIO.parse(seq_file, "fasta")
-    first5 = list(next(records) for _ in range(4))
+    first5 = []
+    for n in range(6):
+        first5.append(next(records))
     seqset = set(''.join([str(record.seq) for record in first5]))
-    dna = set("NATGC")
+    dna = set("NATGCactg")
     nondna = seqset-dna
     if len(nondna) == 0:
         alphabet = 'dna'
@@ -54,6 +56,7 @@ def dna_or_aa(seq_file):
         sys.exit(1)
     else:
         print(f"Error reading {seq_file} ")
+        import pdb; pdb.set_trace()
         sys.exit(1)
     return alphabet
 

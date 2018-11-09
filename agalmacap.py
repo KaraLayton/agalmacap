@@ -47,7 +47,7 @@ def raxpartition_reader(part_file):
     return partitions
 
 
-def alncutter(partitions, aln_file, aln_type, genealn_outdir,write_ref):
+def alncutter(partitions, aln_file, aln_type, genealn_outdir):
     """Divides the aln_file into sub-alignments based on positions in partition list
     Writes gene alignments to genealn_outdirectory as fasta files.
     Ignores sequences made entirely of gaps
@@ -324,7 +324,7 @@ def cut_genealns_to_exon_alns(codex_file, cds_exon_folder, loci_alns, exonaln_fo
     return
 
 
-def aln_filter(aln_folder, filtered_aln_folder, write_ref, min_exon_length=0, min_taxoncov=0):
+def aln_filter(aln_folder, filtered_aln_folder, min_exon_length=0, min_taxoncov=0, write_ref='yes'):
     """Reads all of the fasta sequences in the aln_folder and saves them to the filtered_aln_folder
     if they are longer than the min_exon_length AND have more sequences in the alignment than
     min_taxoncov. The filtered_aln_folder is created if it does not exist.
@@ -339,15 +339,16 @@ def aln_filter(aln_folder, filtered_aln_folder, write_ref, min_exon_length=0, mi
                         and len(records[0].seq) >= min_exon_length:
                 outfile_stem = Path(exon_file).name
                 out_path = Path(filtered_aln_folder)/outfile_stem
-                if write_ref == 'True':
+                if write_ref == 'yes':
                     with open(out_path, 'w') as out_handle:
                         SeqIO.write(records, out_handle, 'fasta')
-                elif write_ref == 'False':
+                elif write_ref == 'no':
                     recs_to_write = [rec for rec in records if '_cds_' not in rec.name]
                     with open(out_path, 'w') as out_handle:
                         SeqIO.write(recs_to_write, out_handle, 'fasta')
                 else:
                     print('Error reading write_ref variable')
+                    print('must be "yes" or "no"')
                     sys.exit()
 
     return
@@ -467,7 +468,7 @@ def pipeline(param):
                 filtered_aln_folder=outdir['fil_aln_loci'],
                 min_exon_length=0,
                 min_taxoncov=param['min_taxoncov'],
-                write_ref=True)
+                write_ref='yes')
 
     consensus_generator(
                         aln_folder=outdir['fil_aln_loci'],
@@ -524,7 +525,7 @@ def pipeline(param):
                 write_ref=param['write_ref'])
     return
 
-
+# For testing
 # pipeline(param='/Users/josec/Desktop/exoncap/Mygal/AgalmacapTesting/Param-test1.txt')
 
 
