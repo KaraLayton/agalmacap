@@ -45,15 +45,12 @@ def dna_or_aa(seq_file):
     for n in range(6):
         first5.append(next(records))
     seqset = set(''.join([str(record.seq) for record in first5]))
-    dna = set("NATGCactg")
+    dna = set("NATGCactg-X")
     nondna = seqset-dna
     if len(nondna) == 0:
         alphabet = 'dna'
-    elif len(nondna) > 4 and '-' not in nondna:
+    elif len(nondna) > 4:
         alphabet = 'aa'
-    elif 'X' in nondna or '-' in nondna:
-        print(f"ERROR:{seq_file} has '-' or 'X' in it. Please fix and run again")
-        sys.exit(1)
     else:
         print(f"Error reading {seq_file} ")
         import pdb; pdb.set_trace()
@@ -79,7 +76,7 @@ def blaster(num_threads, query, blastdb_prefix, blast_out_path=None):
     if dbalphabet == 'aa':
         blast_suffix, dbtype = '.pin', 'prot'
         if qalphabet == 'dna':
-            blast_prog = 'tblastx'
+            blast_prog = 'blastx'
         elif qalphabet == 'aa':
             blast_prog = 'blastp'
     if dbalphabet == 'dna':
