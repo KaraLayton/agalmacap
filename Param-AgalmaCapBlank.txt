@@ -1,5 +1,5 @@
 # projectwd: Project working directory. Where the outfiles will be written to.
-# target_aln_path: Path with target gene alignments. Leave blank if using agalma supermatrix as input. 
+# target_aln_path: Path with target gene alignments. Leave blank if using agalma supermatrix as input. Must end in '.fas'
 # target_aln_type: 'DNA' or 'AA'. Leave blank if using agalma supermatrix as input. 
 # aglama_partition_file: Partition file for agalma supermatrix path
 # agalma_supermatrix_file: Agalma supermatrix alignment path

@@ -87,7 +87,7 @@ def consensus_generator(aln_folder, aln_type, consensus_file):
         for file in alns:
             aln = AlignIO.read(str(file), aln_type)
             summary_align = AlignInfo.SummaryInfo(aln)
-            consensus = summary_align.dumb_consensus()
+            consensus = summary_align.dumb_consensus(threshold=0.7,ambiguous='N')
             out_file.write(f'>{file.stem}\n{consensus}\n')
     return
 
@@ -263,20 +263,20 @@ def cds_loci_merger(codex_file, cds_file, dnabyloci_folder, dnacdsbyloci_folder)
     Path(dnacdsbyloci_folder).mkdir(exist_ok=True)
     codex_dict = codex_file_reader(codex_file)
     cds_records = SeqIO.parse(cds_file, "fasta")
-    for gene in codex_dict.keys():
-        loci_file_path = Path(dnabyloci_folder)/f"{gene}.fas"
-        if loci_file_path.exists():
-            pass
+    for ckey in codex_dict.keys():
+        if (Path(dnabyloci_folder)/f"{ckey}.fas").exists():
+            gene = ckey
         else:
-            loci_file_path = loci_file_path.with_suffix('.fasta')
-        loci_cds_file_path = Path(dnacdsbyloci_folder)/f"{gene}.fas"
+            gene = codex_dict[ckey]
+        loci_file_path = Path(dnabyloci_folder)/f"{gene}.fas"
+        loci_cds_file_path = Path(dnacdsbyloci_folder)/f"{ckey}.fas"
         records_to_write = SeqIO.parse(str(loci_file_path), "fasta")
         if not records_to_write:
             # Skip entry if there are no sequences to write in the DNAbyLoci folder
             break
         else:
             for cds in cds_records:
-                if gene in cds.name:
+                if cds.name in [ckey,codex_dict[ckey]]:
                     with open(loci_cds_file_path, 'w') as out_handle:
                         SeqIO.write(cds, out_handle, 'fasta')
                         SeqIO.write(records_to_write, out_handle, 'fasta')
@@ -316,21 +316,52 @@ def cut_genealns_to_exon_alns(codex_file, cds_exon_folder, loci_alns, exonaln_fo
     """ For each loci in the codex, this will cut the loci alignment by exons
     and save it to exonaln_folder as Loci_ExonNumber.fas
     """
-    good_loci = list(codex_file_reader(codex_file=codex_file).values())
-    if (Path(cds_exon_folder)/f"{good_loci[1]}.fas").exists():
-        pass
+    #determine if codex_dict keys or values are the loci names. Depends on input.
+    codex_dict = codex_file_reader(codex_file=codex_file)
+    test_loci_k,test_loci_v = next(iter(codex_dict.items()))
+    #This means that the input was Agalma-supermatrix
+    if (Path(cds_exon_folder)/f"{test_loci_k}.fas").exists():
+        good_loci = codex_dict.keys()
+        for loci in good_loci:
+            cds_exon_file = Path(cds_exon_folder)/f"{loci}.fas"
+            loci_aln_file = Path(loci_alns)/f"{loci}.fas"            
+            if cds_exon_file.exists() and loci_aln_file.exists():
+                loci_partitions = generate_partitions(
+                                                    substring_fasta=str(cds_exon_file),
+                                                    aln_file=str(loci_aln_file))
+                alncutter(
+                        loci_partitions, aln_file=str(loci_aln_file),
+                        aln_type='fasta', genealn_outdir=exonaln_foler)
+    #This means that the input was AA alignments
+    elif (Path(cds_exon_folder)/f"{test_loci_v.split('.')[0]}.fas").exists():
+        good_loci = codex_dict.keys()
+        for loci in good_loci:
+            cds_exon_file = Path(cds_exon_folder)/f"{codex_dict[loci].split('.')[0]}.fas"
+            loci_aln_file = Path(loci_alns)/f"{loci}.fas"            
+            if cds_exon_file.exists() and loci_aln_file.exists():
+                loci_partitions = generate_partitions(
+                                                    substring_fasta=str(cds_exon_file),
+                                                    aln_file=str(loci_aln_file))
+                alncutter(
+                        loci_partitions, aln_file=str(loci_aln_file),
+                        aln_type='fasta', genealn_outdir=exonaln_foler)
+    #This means that the input was DNA alignments
+    elif len(test_loci_v.split('_cds_')) > 1:
+        good_loci_cds = [x.split("_cds_")[1].split('.')[0] for x in list(codex_dict.values())]
+        good_loci_dna = list(codex_dict.keys())
+        for i,loci_dna in enumerate(good_loci_dna):
+            cds_exon_file = Path(cds_exon_folder)/f"{good_loci_cds[i]}.fas"
+            loci_aln_file = Path(loci_alns)/f"{loci_dna}.fas" 
+            if cds_exon_file.exists() and loci_aln_file.exists():
+                loci_partitions = generate_partitions(
+                                                    substring_fasta=str(cds_exon_file),
+                                                    aln_file=str(loci_aln_file))
+                alncutter(
+                        loci_partitions, aln_file=str(loci_aln_file),
+                        aln_type='fasta', genealn_outdir=exonaln_foler)
     else:
-        good_loci = codex_file_reader(codex_file=codex_file).keys()
-    for loci in good_loci:
-        cds_exon_file = Path(cds_exon_folder)/f"{loci}.fas"
-        loci_aln_file = Path(loci_alns)/f"{loci}.fas"
-        if cds_exon_file.exists() and loci_aln_file.exists():
-            loci_partitions = generate_partitions(
-                                                substring_fasta=str(cds_exon_file),
-                                                aln_file=str(loci_aln_file))
-            alncutter(
-                    loci_partitions, aln_file=str(loci_aln_file),
-                    aln_type='fasta', genealn_outdir=exonaln_foler)
+        print(f'error parsing cds_exon_folder or dnacds_loci files')
+
     return
 
 
@@ -405,7 +436,7 @@ def outdir_creator(param):
     try:
         scratch.mkdir(exist_ok=False)
     except FileExistsError:
-        print(f"delete folder: {scratch} ")
+        print(f"Warning: Overwriting {scratch} ")
         # NOT SURE IF THIS MATTERS. NEED TO TEST
         # scratch2 = basepath/'OLD_Agalmacap_scratch_files'
         # scratch.replace(scratch2)

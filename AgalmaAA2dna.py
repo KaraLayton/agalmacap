@@ -41,10 +41,14 @@ def dna_or_aa(seq_file):
     """Reads 5 lines of fasta seq_file and guesses if DNA or RNA.
     Exits if invalid residues are present"""
     records = SeqIO.parse(seq_file, "fasta")
-    first5 = []
-    for n in range(6):
-        first5.append(next(records))
-    seqset = set(''.join([str(record.seq) for record in first5]))
+    first2 = []
+    for n in range(3):
+        try:
+            first2.append(next(records))
+        except:
+            print(f"Empty file {seq_file}")
+            sys.exit(1)
+    seqset = set(''.join([str(record.seq) for record in first2]))
     dna = set("NATGCactg-X")
     nondna = seqset-dna
     if len(nondna) == 0:
@@ -53,7 +57,7 @@ def dna_or_aa(seq_file):
         alphabet = 'aa'
     else:
         print(f"Error reading {seq_file} ")
-        import pdb; pdb.set_trace()
+        # import pdb; pdb.set_trace()
         sys.exit(1)
     return alphabet
 
@@ -99,6 +103,7 @@ def blaster(num_threads, query, blastdb_prefix, blast_out_path=None):
                         -max_hsps 1
                         -num_threads {num_threads}
                         ''').replace('\n', ' ')
+
     blast_output = run_command(bcommand, command_out_path=blast_out_path)
     return blast_output
 
@@ -155,7 +160,6 @@ def blastbytxtm(alnaa_folder, txtm_folder, txtm, num_threads):
     query_path = Path(alnaa_folder)/"AAbytxtm"
     blastdb_path = str(Path(txtm_folder)/f"{txtm}.fas")
     blast_out = str(query_path/f"{txtm}_recipblast.txt")
-    # This step takes 10 min.
     blaster(
             num_threads=7, query=str(query_path/f"{txtm}.fas"),
             blastdb_prefix=blastdb_path, blast_out_path=blast_out)
@@ -209,7 +213,7 @@ def agalmaaa2txtmdna(codex_file, alnaa_folder, txtm_folder, loci_dna_out_folder,
                         The names of the transcriptome files must match the fasta headers in the
                         AA alignments (whatever agalma sp was designated in the catalog)
     Out:
-        written to alnaa_folder/DNAbyLoci/RefSeqProtIDxx.fas
+        written to loci_dna_out_folder
 
     """
     txtms = []
