@@ -2,7 +2,9 @@
 
 import re
 import subprocess
+import shutil
 import sys
+
 
 from Bio import AlignIO
 from Bio import SeqIO
@@ -85,7 +87,7 @@ def consensus_generator(aln_folder, aln_type, consensus_file):
         for file in alns:
             aln = AlignIO.read(str(file), aln_type)
             summary_align = AlignInfo.SummaryInfo(aln)
-            consensus = summary_align.dumb_consensus()
+            consensus = summary_align.dumb_consensus(threshold=0.7,ambiguous='N')
             out_file.write(f'>{file.stem}\n{consensus}\n')
     return
 
@@ -105,8 +107,8 @@ def run_command(command, command_out_path=None):
 
 
 def codex_generator(num_threads, query, blastdb_prefix, codex_path):
-    """ Blasts the AA consensus of each aglama loci to the Refseqprotein
-    This function removes any agalma genes that blast to the same
+    """ Blasts the consensus of each loci alignemtn to the Refseqprotein or CDS
+    This function removes any genes that blast to the same
     RefSeq gene. This ensures that we do not design baits that target multiple
     portions of the genome."""
     blast_output = blaster(num_threads, query, blastdb_prefix).split("\n")
@@ -259,18 +261,22 @@ def cds_loci_merger(codex_file, cds_file, dnabyloci_folder, dnacdsbyloci_folder)
 
     """
     Path(dnacdsbyloci_folder).mkdir(exist_ok=True)
-    to_fetch = codex_file_reader(codex_file).values()
+    codex_dict = codex_file_reader(codex_file)
     cds_records = SeqIO.parse(cds_file, "fasta")
-    for refseqID in to_fetch:
-        loci_file_path = Path(dnabyloci_folder)/f"{refseqID}.fas"
-        loci_cds_file_path = Path(dnacdsbyloci_folder)/f"{refseqID}.fas"
+    for ckey in codex_dict.keys():
+        if (Path(dnabyloci_folder)/f"{ckey}.fas").exists():
+            gene = ckey
+        else:
+            gene = codex_dict[ckey]
+        loci_file_path = Path(dnabyloci_folder)/f"{gene}.fas"
+        loci_cds_file_path = Path(dnacdsbyloci_folder)/f"{ckey}.fas"
         records_to_write = SeqIO.parse(str(loci_file_path), "fasta")
         if not records_to_write:
             # Skip entry if there are no sequences to write in the DNAbyLoci folder
             break
         else:
             for cds in cds_records:
-                if refseqID in cds.name:
+                if cds.name in [ckey,codex_dict[ckey]]:
                     with open(loci_cds_file_path, 'w') as out_handle:
                         SeqIO.write(cds, out_handle, 'fasta')
                         SeqIO.write(records_to_write, out_handle, 'fasta')
@@ -310,17 +316,52 @@ def cut_genealns_to_exon_alns(codex_file, cds_exon_folder, loci_alns, exonaln_fo
     """ For each loci in the codex, this will cut the loci alignment by exons
     and save it to exonaln_folder as Loci_ExonNumber.fas
     """
-    good_loci = codex_file_reader(codex_file=codex_file).values()
-    for loci in good_loci:
-        cds_exon_file = Path(cds_exon_folder)/f"{loci}.fas"
-        loci_aln_file = Path(loci_alns)/f"{loci}.fas"
-        if cds_exon_file.exists() and loci_aln_file.exists():
-            loci_partitions = generate_partitions(
-                                                substring_fasta=str(cds_exon_file),
-                                                aln_file=str(loci_aln_file))
-            alncutter(
-                    loci_partitions, aln_file=str(loci_aln_file),
-                    aln_type='fasta', genealn_outdir=exonaln_foler)
+    #determine if codex_dict keys or values are the loci names. Depends on input.
+    codex_dict = codex_file_reader(codex_file=codex_file)
+    test_loci_k,test_loci_v = next(iter(codex_dict.items()))
+    #This means that the input was Agalma-supermatrix
+    if (Path(cds_exon_folder)/f"{test_loci_k}.fas").exists():
+        good_loci = codex_dict.keys()
+        for loci in good_loci:
+            cds_exon_file = Path(cds_exon_folder)/f"{loci}.fas"
+            loci_aln_file = Path(loci_alns)/f"{loci}.fas"            
+            if cds_exon_file.exists() and loci_aln_file.exists():
+                loci_partitions = generate_partitions(
+                                                    substring_fasta=str(cds_exon_file),
+                                                    aln_file=str(loci_aln_file))
+                alncutter(
+                        loci_partitions, aln_file=str(loci_aln_file),
+                        aln_type='fasta', genealn_outdir=exonaln_foler)
+    #This means that the input was AA alignments
+    elif (Path(cds_exon_folder)/f"{test_loci_v.split('.')[0]}.fas").exists():
+        good_loci = codex_dict.keys()
+        for loci in good_loci:
+            cds_exon_file = Path(cds_exon_folder)/f"{codex_dict[loci].split('.')[0]}.fas"
+            loci_aln_file = Path(loci_alns)/f"{loci}.fas"            
+            if cds_exon_file.exists() and loci_aln_file.exists():
+                loci_partitions = generate_partitions(
+                                                    substring_fasta=str(cds_exon_file),
+                                                    aln_file=str(loci_aln_file))
+                alncutter(
+                        loci_partitions, aln_file=str(loci_aln_file),
+                        aln_type='fasta', genealn_outdir=exonaln_foler)
+    #This means that the input was DNA alignments
+    elif len(test_loci_v.split('_cds_')) > 1:
+        good_loci_cds = [x.split("_cds_")[1].split('.')[0] for x in list(codex_dict.values())]
+        good_loci_dna = list(codex_dict.keys())
+        for i,loci_dna in enumerate(good_loci_dna):
+            cds_exon_file = Path(cds_exon_folder)/f"{good_loci_cds[i]}.fas"
+            loci_aln_file = Path(loci_alns)/f"{loci_dna}.fas" 
+            if cds_exon_file.exists() and loci_aln_file.exists():
+                loci_partitions = generate_partitions(
+                                                    substring_fasta=str(cds_exon_file),
+                                                    aln_file=str(loci_aln_file))
+                alncutter(
+                        loci_partitions, aln_file=str(loci_aln_file),
+                        aln_type='fasta', genealn_outdir=exonaln_foler)
+    else:
+        print(f'error parsing cds_exon_folder or dnacds_loci files')
+
     return
 
 
@@ -361,6 +402,8 @@ def param_reader(paramfile_path):
     param = {}
     keys = [
             'projectwd',
+            'target_aln_path',
+            'target_aln_type',
             'aglama_partition_file',
             'agalma_supermatrix_file',
             'transcriptome_folder',
@@ -393,14 +436,14 @@ def outdir_creator(param):
     try:
         scratch.mkdir(exist_ok=False)
     except FileExistsError:
-        print(f"delete folder: {scratch} ")
+        print(f"Warning: Overwriting {scratch} ")
         # NOT SURE IF THIS MATTERS. NEED TO TEST
         # scratch2 = basepath/'OLD_Agalmacap_scratch_files'
         # scratch.replace(scratch2)
         # scratch.mkdir(exist_ok=False)
     aa_loci = scratch/'1_aa_aln'            # Agalma supermatrix cut into gene alignments. Each agalma gene is now called a loci
     fil_aln_loci = scratch/'2_aa_faln'      # AA loci alingments with min_taxoncov filtered applied
-    cons_aa_loci = scratch/'3_aa_cons.fas'  # Consensus seqs of each AA loci alignment
+    cons_loci = scratch/'3_cons.fas'  # Consensus seqs of each loci alignment
     codex_path = scratch/'4_codex.txt'              # Consensus of agalma loci blasted to RefSeq AA. Used to annotate each loci as a RefseqProtein ID
     dna_loci = scratch/'5_dna_loci'         # DNA sequences of each loci
     refseqcds_loci = scratch/'6_refseqcds_loci.fas'             # All of the RefSeq CDS that were in the codex (ie all the CDS that agalma identified as homologous loci)
@@ -418,7 +461,7 @@ def outdir_creator(param):
     keys = [
             'aa_loci',
             'fil_aln_loci',
-            'cons_aa_loci',
+            'cons_loci',
             'codex_path',
             'dna_loci',
             'refseqcds_loci',
@@ -431,7 +474,7 @@ def outdir_creator(param):
     path_values = [
                     aa_loci,
                     fil_aln_loci,
-                    cons_aa_loci,
+                    cons_loci,
                     codex_path,
                     dna_loci,
                     refseqcds_loci,
@@ -451,18 +494,7 @@ def outdir_creator(param):
     return outdir
 
 
-def pipeline(param):
-    param = param_reader(param)
-    outdir = outdir_creator(param)
-
-    partitions = raxpartition_reader(part_file=param['aglama_partition_file'])
-
-    alncutter(
-                partitions=partitions,
-                aln_file=param['agalma_supermatrix_file'],
-                aln_type=param['supermatrix_aln_type'],
-                genealn_outdir=outdir['aa_loci'])
-
+def AAaln2DNAaln_steps(param,outdir):
     aln_filter(
                 aln_folder=outdir['aa_loci'],
                 filtered_aln_folder=outdir['fil_aln_loci'],
@@ -473,11 +505,11 @@ def pipeline(param):
     consensus_generator(
                         aln_folder=outdir['fil_aln_loci'],
                         aln_type='fasta',
-                        consensus_file=outdir['cons_aa_loci'])
+                        consensus_file=outdir['cons_loci'])
 
     codex_generator(
                     num_threads=param['threads'],
-                    query=outdir['cons_aa_loci'],
+                    query=outdir['cons_loci'],
                     blastdb_prefix=param['refseqprotein_path'],
                     codex_path=outdir['codex_path'])
 
@@ -487,6 +519,50 @@ def pipeline(param):
                     txtm_folder=param['transcriptome_folder'],
                     loci_dna_out_folder=outdir['dna_loci'],
                     num_threads=param['threads'])
+    return
+
+
+
+def pipeline(param):
+    param = param_reader(param)
+    outdir = outdir_creator(param)
+
+    #Three different paths depending on in input is AAalignments, DNAalignments or AgalmaSupermatrix
+    if param['target_aln_path']:
+    #AA alignment input:
+        if param['target_aln_type'] == 'AA':
+            shutil.rmtree(outdir['aa_loci'])
+            shutil.copytree(param['target_aln_path'],outdir['aa_loci'])
+            AAaln2DNAaln_steps(param=param,outdir=outdir)
+    #DNA alignment input:
+        elif param['target_aln_type'] == 'DNA': 
+            shutil.rmtree(outdir['dna_loci'])
+            shutil.copytree(param['target_aln_path'],outdir['dna_loci'])
+            consensus_generator(
+                    aln_folder=outdir['dna_loci'],
+                    aln_type='fasta',
+                    consensus_file=outdir['cons_loci'])
+
+            codex_generator(
+                    num_threads=param['threads'],
+                    query=outdir['cons_loci'],
+                    blastdb_prefix=param['refseqcds_path'],
+                    codex_path=outdir['codex_path'])
+        else:
+            print('Please put "DNA" or "AA" in for target_aln_type parameter. Leave blank if using Agalma supermatrix as input')
+    #AgalmaSupermatrix input
+    else: 
+        partitions = raxpartition_reader(part_file=param['aglama_partition_file'])
+
+        alncutter(
+                    partitions=partitions,
+                    aln_file=param['agalma_supermatrix_file'],
+                    aln_type=param['supermatrix_aln_type'],
+                    genealn_outdir=outdir['aa_loci'])
+
+        AAaln2DNAaln_steps(param=param,outdir=outdir)
+
+
 
     fetch_refseqcds(
                     refseqcds=param['refseqcds_path'],
@@ -537,10 +613,10 @@ def main():
         print(usage)
         sys.exit(1)
     if args[0] == '--param':
-        param = args[1]
+        param_path = args[1]
 
     # start = timer()
-    pipeline(param=param)
+    pipeline(param=param_path)
     # end = timer()
     # print(end - start)
 

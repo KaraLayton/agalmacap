@@ -13,7 +13,7 @@ This pipeline automates the steps required to generate exon alignments from Agal
 
 ## Input Files:
 
-+ Agalma supermatrix and partition file. Output of the Agalma phylogeny pipeline.
++ Agalma supermatrix and partition file. Output of the Agalma phylogeny pipeline. Can also be a directory of fasta alignments.
 + Transcriptome assemblies of the taxa included in the Agalma analysis. Note all of the transcriptome assembly files must have the name of the sequences in the supermatrix. The file endings must be '.fas'
 + Parameter file. Place all the values before the '#'. See Param-AgalmaCapBlank.txt 
 + Refseq genome files in a folder. The genomic.fna, cds_from_genomic.fna files and translated_CDS.faa are required. Download via FTP from here: ftp.ncbi.nih.gov/genomes/refseq/ Example:

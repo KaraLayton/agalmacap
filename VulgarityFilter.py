@@ -66,7 +66,7 @@ def writer(target_dict, gene_out_folder):
     cds = target_dict['cds']
     try:
         gene_raw = target_dict['Target'].split("cds_")[1].split("_")
-        gene = f"{gene_raw[0]}_{gene_raw[1]}"
+        gene = f"{gene_raw[0]}_{gene_raw[1].split('.')[0]}"
     except KeyError:
         gene = target_dict['Target']
     exonseq_list = splitter(cds, vlist)
