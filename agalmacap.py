@@ -266,8 +266,11 @@ def cds_loci_merger(codex_file, cds_file, dnabyloci_folder, dnacdsbyloci_folder)
     for ckey in codex_dict.keys():
         if (Path(dnabyloci_folder)/f"{ckey}.fas").exists():
             gene = ckey
-        else:
+        elif (Path(dnabyloci_folder)/f"{codex_dict[ckey]}.fas").exists():
             gene = codex_dict[ckey]
+        else:
+            print("do the input alignment end in .fas???")
+            sys.exit(1)
         loci_file_path = Path(dnabyloci_folder)/f"{gene}.fas"
         loci_cds_file_path = Path(dnacdsbyloci_folder)/f"{ckey}.fas"
         records_to_write = SeqIO.parse(str(loci_file_path), "fasta")

@@ -64,7 +64,7 @@ def dna_or_aa(seq_file):
 
 def blaster(num_threads, query, blastdb_prefix, blast_out_path=None):
     """Runs a blast search and returns the names of the top hit sequences from the blast database
-    (min eval = 1e-50)
+    (min eval = 1e-30)
 
     Args:
         threads: the number of threads
@@ -97,7 +97,7 @@ def blaster(num_threads, query, blastdb_prefix, blast_out_path=None):
     bcommand = dedent(f'''
                         {blast_prog} -query {query}
                         -db {blastdb_prefix}
-                        -evalue 1e-50
+                        -evalue 1e-30
                         -outfmt '6 qseqid sseqid'
                         -max_target_seqs 1
                         -max_hsps 1
