@@ -266,8 +266,11 @@ def cds_loci_merger(codex_file, cds_file, dnabyloci_folder, dnacdsbyloci_folder)
     for ckey in codex_dict.keys():
         if (Path(dnabyloci_folder)/f"{ckey}.fas").exists():
             gene = ckey
-        else:
+        elif (Path(dnabyloci_folder)/f"{codex_dict[ckey]}.fas").exists():
             gene = codex_dict[ckey]
+        else:
+            print("do the input alignment end in .fas???")
+            sys.exit(1)
         loci_file_path = Path(dnabyloci_folder)/f"{gene}.fas"
         loci_cds_file_path = Path(dnacdsbyloci_folder)/f"{ckey}.fas"
         records_to_write = SeqIO.parse(str(loci_file_path), "fasta")
@@ -276,7 +279,7 @@ def cds_loci_merger(codex_file, cds_file, dnabyloci_folder, dnacdsbyloci_folder)
             break
         else:
             for cds in cds_records:
-                if cds.name in [ckey,codex_dict[ckey]]:
+                if ckey in cds.name or codex_dict[ckey] in cds.name:
                     with open(loci_cds_file_path, 'w') as out_handle:
                         SeqIO.write(cds, out_handle, 'fasta')
                         SeqIO.write(records_to_write, out_handle, 'fasta')
@@ -369,7 +372,7 @@ def aln_filter(aln_folder, filtered_aln_folder, min_exon_length=0, min_taxoncov=
     """Reads all of the fasta sequences in the aln_folder and saves them to the filtered_aln_folder
     if they are longer than the min_exon_length AND have more sequences in the alignment than
     min_taxoncov. The filtered_aln_folder is created if it does not exist.
-    If write_ref='True' the reference CDS sequence will be retained in final alingment.
+    If write_ref='yes' the reference CDS sequence will be retained in final alingment.
     """
     Path(filtered_aln_folder).mkdir(exist_ok=True)
     efls = [str(exon_file) for exon_file in Path(aln_folder).iterdir() if '.fa' in exon_file.suffix]
