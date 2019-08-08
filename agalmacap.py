@@ -262,7 +262,7 @@ def cds_loci_merger(codex_file, cds_file, dnabyloci_folder, dnacdsbyloci_folder)
     """
     Path(dnacdsbyloci_folder).mkdir(exist_ok=True)
     codex_dict = codex_file_reader(codex_file)
-    cds_records = SeqIO.parse(cds_file, "fasta")
+    cds_records = list(SeqIO.parse(cds_file, "fasta"))
     for ckey in codex_dict.keys():
         if (Path(dnabyloci_folder)/f"{ckey}.fas").exists():
             gene = ckey
@@ -279,11 +279,12 @@ def cds_loci_merger(codex_file, cds_file, dnabyloci_folder, dnacdsbyloci_folder)
             break
         else:
             for cds in cds_records:
+
                 if ckey in cds.name or codex_dict[ckey] in cds.name:
                     with open(loci_cds_file_path, 'w') as out_handle:
                         SeqIO.write(cds, out_handle, 'fasta')
                         SeqIO.write(records_to_write, out_handle, 'fasta')
-                        break
+                        
     return
 
 

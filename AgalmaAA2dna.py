@@ -117,8 +117,9 @@ def codex_file_reader(codex_file):
     codex_dict = {}
     with open(codex_file) as f:
         for line in f:
-            (agalID, RefseqProtID) = line.split()
-            codex_dict[agalID] = RefseqProtID
+            if 'Warning' not in line:
+                (agalID, RefseqProtID) = line.split()
+                codex_dict[agalID] = RefseqProtID
     return codex_dict
 
 
@@ -166,7 +167,7 @@ def blastbytxtm(alnaa_folder, txtm_folder, txtm, num_threads):
     # store blast results as dictionary
     rblast_dict = {}
     with open(blast_out, 'r') as rblastout_handle:
-        rblast_lines = [line.split() for line in rblastout_handle.readlines()]
+        rblast_lines = [line.split() for line in rblastout_handle.readlines() if 'Warning' not in line]## for new blast version a header line is inserted with word 'Warning' and should be ignored 
         for line in rblast_lines:
             rblast_dict[line[1]] = line[0]
     # fetch each sequences from the transcriptome and write them to a new file send to cat_by_gene()

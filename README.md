@@ -7,15 +7,14 @@ python3 agalmacap.py --param parameterfile.txt
 ```
 
 ## Description:
-This pipeline automates the steps required to generate exon alignments from Agalma amino acid (AA) data. These exon alignments are DNA sequences of homologous genes identified from an Agalma transcriptome search that are cut at the intron sites of the closest reference genome. 
-
+This pipeline automates the steps required to generate exon alignments from DNA or AA gene alignment data. These exon alignments are DNA sequences of homologous genes cut at the intron sites of the provided reference genome. These exon alignments can aid in more efficient exon-capture bait design where baits do not span intron boundaries. This workflow is non-model organism friendly and relatedness of the reference genome is relaxed (ie same family-order). Agalmacap was innitially designed to take the Agalma output files to generate intron alignments, but has since been upgraded to be more relaxed with the input file formats. 
 
 
 ## Input Files:
 
-+ Agalma supermatrix and partition file. Output of the Agalma phylogeny pipeline. Can also be a directory of fasta alignments.
-+ Transcriptome assemblies of the taxa included in the Agalma analysis. Note all of the transcriptome assembly files must have the name of the sequences in the supermatrix. The file endings must be '.fas'
-+ Parameter file. Place all the values before the '#'. See Param-AgalmaCapBlank.txt 
++ DNA or AA alignments of homologous genes from a group of transcriptomes. Alternatively an Agalma supermatrix and partition file can be used as inputs. 
++ Transcriptome assemblies of the taxa included in the gene alignments or Agalma analysis. All of the transcriptome assembly files must have the name of the sequences in the gene alignments or supermatrix. The file endings must be '.fas'
++ Parameter file. Type all the values to the left of the '#'. See Param-AgalmaCapBlank.txt 
 + Refseq genome files in a folder. The genomic.fna, cds_from_genomic.fna files and translated_CDS.faa are required. Download via FTP from here: ftp.ncbi.nih.gov/genomes/refseq/ Example:
 ```
 curl -O ftp.ncbi.nih.gov/genomes/refseq/invertebrate/Aplysia_californica/latest_assembly_versions/GCF_000002075.1_AplCal3.0/GCF_000002075.1_AplCal3.0_cds_from_genomic.fna.gz
@@ -25,7 +24,7 @@ curl -O ftp.ncbi.nih.gov/genomes/refseq/invertebrate/Aplysia_californica/latest_
 
 ## Required:
 Python3 Libraries:
-+ Pool
+
 + BioPython
 + regex
 + subprocess
@@ -34,6 +33,6 @@ Python3 Libraries:
 + multiprocessing
 
 Programs in Path:
-+ tBlastx
-+ Exonerate
-+ Mafft
++ tBlastx (https://blast.ncbi.nlm.nih.gov/Blast.cgi?PAGE_TYPE=BlastDocs&DOC_TYPE=Download)
++ Exonerate (https://www.ebi.ac.uk/about/vertebrate-genomics/software/exonerate)
++ Mafft (https://mafft.cbrc.jp/alignment/software/)
