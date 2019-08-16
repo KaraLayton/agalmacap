@@ -24,13 +24,13 @@ curl -O ftp.ncbi.nih.gov/genomes/refseq/invertebrate/Aplysia_californica/latest_
 
 ## Required:
 Python3 Libraries:
-
 + BioPython
 + regex
 + subprocess
 + Pathlib
 + textwrap
 + multiprocessing
+
 
 Programs in Path:
 + tBlastx (https://blast.ncbi.nlm.nih.gov/Blast.cgi?PAGE_TYPE=BlastDocs&DOC_TYPE=Download)
