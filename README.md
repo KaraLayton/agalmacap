@@ -7,7 +7,7 @@ python3 agalmacap.py --param parameterfile.txt
 ```
 
 ## Description:
-This pipeline automates the steps required to generate exon alignments from DNA or AA gene alignment data. These exon alignments are DNA sequences of homologous genes cut at the intron sites of the provided reference genome. These exon alignments can aid in more efficient exon-capture bait design where baits do not span intron boundaries. This workflow is non-model organism friendly and relatedness of the reference genome is relaxed (ie same family-order). Agalmacap was innitially designed to take the Agalma output files to generate intron alignments, but has since been upgraded to allow more input file formats. 
+This pipeline generates exon alignments from DNA or AA gene alignment data. These exon alignments are DNA sequences of homologous genes cut at the intron sites of the provided reference genome. These exon alignments can aid in more efficient exon-capture bait design where baits do not span intron boundaries. This workflow is non-model organism friendly and relatedness of the reference genome is relaxed (ie same family-order). Agalmacap was innitially designed to take the Agalma output files to generate intron alignments, but has since been upgraded to allow more input file formats. 
 
 
 ## Input Files:
