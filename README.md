@@ -26,10 +26,6 @@ curl -O ftp.ncbi.nih.gov/genomes/refseq/invertebrate/Aplysia_californica/latest_
 Python3 Libraries:
 + BioPython
 + regex
-+ subprocess
-+ Pathlib
-+ textwrap
-+ multiprocessing
 
 
 Programs in Path:
