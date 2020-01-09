@@ -137,7 +137,7 @@ def generate_partitions(substring_fasta, aln_file):
     Args:
         substring_fasta: path to VulgarityFilter output. The exon seqs for each RefSeqCDS in order
         aln_file: path to lessgappy_mafter output. The RefSeqCDS sequence must be in the alignment
-                    and it must have '_cds_' in the fasta header. Should have it from
+                    and it must have '_cds_' in the fasta header. Should have it if from
                     Genbank.
 
     Out:
@@ -163,7 +163,7 @@ def generate_partitions(substring_fasta, aln_file):
 
     # find the end of the last index
     while last_exon_string not in cds_string:
-        last_exon_string = last_exon_string[1:]
+        last_exon_string = last_exon_string[1:-1]
     end_of_gene = len(last_exon_string) + cds_string.index(last_exon_string) + 1
     exon_starts.append(end_of_gene)
 
